@@ -2,6 +2,7 @@ const { Connection, PublicKey } = require("@solana/web3.js");
 const { TOKEN_PROGRAM_ID, TOKEN_MINT, NETWORK } = require("../config");
 const db = require("../db/memory");
 
+// Use a dedicated RPC if possible:
 const connection = new Connection(NETWORK, {
   commitment: "confirmed",
   maxSupportedTransactionVersion: 0,
@@ -13,8 +14,10 @@ async function listenForTransfers() {
 
     try {
       const tx = await connection.getParsedTransaction(txSignature, {
+        commitment: "confirmed",
         maxSupportedTransactionVersion: 0,
       });
+
       if (!tx || !tx.meta || !tx.transaction) return;
 
       const instructions = tx.transaction.message.instructions;
