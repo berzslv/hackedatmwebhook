@@ -4,31 +4,32 @@ const db = require("../db/memory");
 
 const connection = new Connection(NETWORK, "confirmed");
 
-async function getTransactionWithRetry(signature, retries = 3) {
-  while (retries > 0) {
+async function fetchTransactionWithRetry(txSignature, retries = 3) {
+  let attempt = 0;
+  let success = false;
+  let tx;
+
+  while (attempt < retries && !success) {
     try {
-      // Attempt to fetch the transaction
-      const tx = await connection.getParsedTransaction(signature, "confirmed");
-      return tx;
-    } catch (err) {
-      if (err.message.includes("Transaction version (0)")) {
-        console.error("Transaction version not supported, retrying...");
-        await sleep(1000); // Wait before retrying
-      } else if (err.message.includes("429 Too Many Requests")) {
-        console.error("Rate limit exceeded, retrying...");
-        await sleep(1000); // Wait before retrying
+      tx = await connection.getParsedTransaction(txSignature, {
+        commitment: "confirmed",
+        maxSupportedTransactionVersion: 0
+      });
+      success = true;
+    } catch (error) {
+      if (error.message.includes("429")) {
+        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+        console.log(`Rate limit hit. Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        attempt++;
       } else {
-        console.error("Error fetching transaction:", err.message);
+        console.error("Error fetching transaction:", error.message);
         break;
       }
-      retries--;
     }
   }
-  return null; // Return null if all retries fail
-}
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return tx;
 }
 
 async function listenForTransfers() {
@@ -36,8 +37,7 @@ async function listenForTransfers() {
     const txSignature = logInfo.signature;
 
     try {
-      const tx = await getTransactionWithRetry(txSignature);
-
+      const tx = await fetchTransactionWithRetry(txSignature);
       if (!tx || !tx.meta || !tx.transaction) return;
 
       const instructions = tx.transaction.message.instructions;
