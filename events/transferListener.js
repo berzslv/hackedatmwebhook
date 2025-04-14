@@ -9,13 +9,8 @@ async function listenForTransfers() {
     const txSignature = logInfo.signature;
 
     try {
-      // Fetch the transaction with maxSupportedTransactionVersion
-      const tx = await connection.getParsedTransaction(txSignature, {
-        commitment: "confirmed",
-        maxSupportedTransactionVersion: 0,
-      });
-
-      // Check if the transaction is valid
+      // Use getTransaction instead of getParsedTransaction
+      const tx = await connection.getTransaction(txSignature, { commitment: "confirmed" });
       if (!tx || !tx.meta || !tx.transaction) return;
 
       const instructions = tx.transaction.message.instructions;
